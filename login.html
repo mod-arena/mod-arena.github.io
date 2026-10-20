@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome · Moderation Arena</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏟️</text></svg>">
+<link rel="stylesheet" href="static/auth.css">
+</head>
+<body>
+  <main class="auth-main">
+  <div class="auth-card">
+    <h1>Moderation Arena</h1>
+    <p class="auth-sub">Enter a nickname or reviewer ID (not your real name). Votes are stored only in this browser; use “Download votes” at the end.</p>
+
+    <form id="auth-form" onsubmit="return false;">
+      <label for="name">Reviewer ID / nickname</label>
+      <input id="name" type="text" maxlength="64" autocomplete="off" autofocus>
+
+      <div id="error" class="auth-error" style="display:none"></div>
+
+      <button id="submit-btn" type="submit">Continue</button>
+    </form>
+  </div>
+  </main>
+  
+
+<script src="static/config.js"></script>
+<script src="static/static-api.js"></script>
+<script>
+const form  = document.getElementById('auth-form');
+const errEl = document.getElementById('error');
+const btn   = document.getElementById('submit-btn');
+
+function showError(msg) {
+  errEl.textContent = msg;
+  errEl.style.display = 'block';
+}
+
+async function submit() {
+  const name = document.getElementById('name').value.trim();
+  errEl.style.display = 'none';
+  if (!name) { showError('Please enter your name.'); return; }
+
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/enter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { showError(data.detail || 'Could not continue.'); return; }
+    window.location.href = 'index.html';
+  } catch (e) {
+    showError('Network error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+form.addEventListener('submit', submit);
+</script>
+</body>
+</html>
