@@ -26,16 +26,17 @@
 
     if (path === '/api/enter') {
       const name = JSON.parse(opts.body).name.replace(/\s+/g, ' ').trim();
-      if (!name) return reply({ detail: 'Please enter an ID.' }, 400);
+      if (!name) return reply({ detail: 'Please pick a name.' }, 400);
       set('arena_user', name);
       return reply({ ok: true });
     }
     if (path === '/api/logout') { LS.removeItem('arena_user'); return reply({ ok: true }); }
     if (path === '/api/me') {
       if (!user()) return reply({ logged_in: false });
-      return reply({ logged_in: true, username: user(), vote_count: Object.keys(votes()).length });
+            return reply({ logged_in: true, username: user(), vote_count: Object.keys(votes()).length });
     }
-    if (!user()) return reply({ detail: 'Please enter an ID first.' }, 401);
+
+    if (!user()) return reply({ detail: 'Please pick a name first.' }, 401);
 
     if (path === '/api/sample') {
       const all = await load('samples.json'), done = votes();
