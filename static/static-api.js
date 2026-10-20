@@ -19,6 +19,29 @@
     a.click();
   };
 
+  // ── Firebase: write each vote to Firestore (collection "votes", doc id = reviewer__sample) ──
+  let fsReady = null;
+  function loadScript(src) {
+    return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+  }
+  function firestore() {
+    if (!window.FIREBASE_CONFIG) return Promise.resolve(null);
+    if (!fsReady) {
+      const base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+      fsReady = loadScript(base + 'firebase-app-compat.js')
+        .then(() => loadScript(base + 'firebase-firestore-compat.js'))
+        .then(() => { firebase.initializeApp(window.FIREBASE_CONFIG); return firebase.firestore(); })
+        .catch(() => null);
+    }
+    return fsReady;
+  }
+  async function pushVote(row) {
+    const db = await firestore();
+    if (!db) return;
+    const id = (row.reviewer + '__' + row.sample_id).replace(/[\/\s]+/g, '_');
+    try { await db.collection('votes').doc(id).set(row); } catch (e) { console.warn('vote not saved remotely', e); }
+  }
+
   const realFetch = window.fetch.bind(window);
   window.fetch = async function (url, opts = {}) {
     if (typeof url !== 'string' || !url.startsWith('/api/')) return realFetch(url, opts);
@@ -60,6 +83,7 @@
       const row = { reviewer: user(), sample_id: id, left_policy: left.policy, right_policy: right.policy,
         pref_label: b.pref_label, pref_action: b.pref_action, pref_quotes: b.pref_quotes, created_at: new Date().toISOString() };
       const v = votes(); v[id] = row; set('arena_votes:' + user().toLowerCase(), v);
+      pushVote(row);
       if (window.ARENA_SUBMIT_URL) {
         realFetch(window.ARENA_SUBMIT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(row) }).catch(() => {});
       }
