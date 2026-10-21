@@ -1,28 +1,43 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+<script src="static/config.js"></script>
+<script src="static/static-api.js"></script>
+<script src="static/ratings.js"></script>
+
+<script>
+// Every visit (new tab or window, or after the browser was closed) starts with the name entry; a reload keeps it.
+try { if (!sessionStorage.getItem('arena_entered')) location.replace('login.html'); } catch (e) { /* storage blocked: the session cookie still protects the API */ }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Moderation Arena</title>
+<title>Welcome · Moderation Arena</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏟️</text></svg>">
 <link rel="stylesheet" href="static/style.css">
-<style>
-  .random-warning {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    margin: 10px auto 0; padding: 8px 14px; border-radius: 8px;
-    width: fit-content; white-space: nowrap;
-    background: #fff8e1; border: 1px solid #f6c94e;
-    color: #7a5a00; font-size: 0.8rem; line-height: 1.45; text-align: center;
-  }
-  [data-theme="dark"] .random-warning {
-    background: rgba(246,201,78,0.1); border-color: rgba(246,201,78,0.4); color: #d4a93a;
-  }
-  .random-warning i { flex-shrink: 0; color: #e6a800; align-self: center; }
-  [data-theme="dark"] .random-warning i { color: #d4a93a; }
-</style>
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style>
+  .landing { width: 100%; max-width: 760px; margin: 8px auto 40px; }
+  .landing-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 34px 30px; }
+  .md { font-size: 0.96rem; line-height: 1.7; color: var(--text-body); }
+  .md h1 { font-size: 1.75rem; font-weight: 700; color: var(--text-primary); margin: 0 0 14px; letter-spacing: -0.01em; }
+  .md h2 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin: 26px 0 8px; }
+  .md p { margin: 0 0 12px; }
+  .md ul, .md ol { margin: 0 0 12px; padding-left: 1.4em; }
+  .md li { margin: 0.3em 0; }
+  .md strong { color: var(--text-primary); }
+  .md code { font-family: monospace; font-size: 0.9em; background: var(--border); padding: 0 4px; border-radius: 3px; }
+  .md a { color: #0085ff; }
+  .landing-start { text-align: center; margin-top: 26px; }
+  .start-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 34px; border-radius: 12px; border: none;
+    background: #0085ff; color: #fff; font-size: 1.05rem; font-weight: 600;
+    text-decoration: none; cursor: pointer; transition: background 0.15s;
+  }
+  .start-btn:hover { background: #0073e0; }
+  .landing-name { margin-top: 12px; font-size: 0.82rem; color: var(--text-muted); }
+</style>
 </head>
 <body>
 
@@ -33,9 +48,21 @@
   </button>
 
   <div class="sidebar-top">
-    <a class="sidebar-btn active" href="index.html" title="New Post">
+    <a class="sidebar-btn active" href="index.html" title="Home">
+      <span class="sidebar-icon"><i class="fa-solid fa-house"></i></span>
+      <span class="sidebar-label">Home</span>
+    </a>
+    <a class="sidebar-btn" href="arena.html" title="New Post">
       <span class="sidebar-icon"><i class="fa-solid fa-comment-medical"></i></span>
       <span class="sidebar-label">New Post</span>
+    </a>
+    <a class="sidebar-btn" href="leaderboard.html" title="Leaderboard">
+      <span class="sidebar-icon"><i class="fa-solid fa-ranking-star"></i></span>
+      <span class="sidebar-label">Leaderboard</span>
+    </a>
+    <a class="sidebar-btn" id="annotate-btn" href="annotate.html" title="Annotate" style="display:none">
+      <span class="sidebar-icon"><i class="fa-solid fa-list-check"></i></span>
+      <span class="sidebar-label">Annotate</span>
     </a>
   </div>
 
@@ -43,10 +70,6 @@
     <div class="sidebar-user">
       <span id="user-info" class="user-info"></span>
     </div>
-    <button class="sidebar-btn" onclick="viewHelp()" title="Help">
-      <span class="sidebar-icon"><i class="fa-solid fa-circle-question"></i></span>
-      <span class="sidebar-label">Help</span>
-    </button>
     <button class="sidebar-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">
       <span class="sidebar-icon"><i class="fa-solid fa-moon"></i></span>
       <span class="sidebar-label">Dark</span>
@@ -83,110 +106,80 @@ function toggleSidebar() {
 
 <div class="topbar">
   <h1 class="topbar-wordmark">🏟️ Moderation Arena</h1>
-  <div class="topbar-controls">
-    <div class="setup-pill" id="mode-pill" style="cursor:default">
-      <span class="pill-text" id="mode-pill-text"><i class="fa-solid fa-bolt-lightning"></i> Policy Battle</span>
+</div>
+
+<div class="landing">
+  <div class="landing-card">
+    <div id="landing-md" class="md"><div class="spinner"></div></div>
+    <div class="landing-start">
+      <a class="start-btn" href="arena.html"><i class="fa-solid fa-shuffle"></i> Show me a random post</a>
+      <div id="annotate-start" style="display:none;margin-top:14px">
+        <a class="start-btn" href="annotate.html" style="background:transparent;color:#0085ff;border:1.5px solid #0085ff;padding:11px 26px;font-size:0.98rem">
+          <i class="fa-solid fa-list-check"></i> <span id="annotate-start-text">Annotation</span></a>
+      </div>
+      <div class="landing-name" id="landing-name"></div>
     </div>
   </div>
 </div>
 
-<div class="hero-area compact">
-  <div class="random-warning">
-    <i class="fa-solid fa-triangle-exclamation"></i>
-    <span>Randomly sampled posts may contain graphic gore, violence, self-harm, sexually explicit content, hate speech, or toxicity. User discretion is advised.</span>
-  </div>
-</div>
-
-<div id="result"></div>
-
-<div id="arena-hint" class="ag-hint" style="display:none">Compare the two decisions row by row and mark which policy you prefer for each.</div>
-
-<div id="arena-grid" class="arena-grid" style="display:none">
-  <div class="ag-cell ag-left ag-first">
-    <div class="panel-label"><span>Policy A</span><button id="cmp-result-view-policy-a" class="view-link" onclick="viewResultPolicy('a')" style="display:none">Show full policy</button></div>
-    <div id="cmp-identity-a" class="cmp-identity" style="display:none"></div>
-  </div>
-  <div class="ag-mid"></div>
-  <div class="ag-cell ag-right ag-first">
-    <div class="panel-label"><span>Policy B</span><button id="cmp-result-view-policy-b" class="view-link" onclick="viewResultPolicy('b')" style="display:none">Show full policy</button></div>
-    <div id="cmp-identity-b" class="cmp-identity" style="display:none"></div>
-  </div>
-  <div class="ag-cell ag-left" id="ag-label-a"></div>
-  <div class="ag-mid">
-    <div class="ag-aspect">Label</div>
-    <div class="seg" role="group" aria-label="Preference: Label">
-      <button class="seg-btn" id="pref-label-left"    onclick="setPreference('label', 'left')"    title="Policy A is better">A</button>
-      <button class="seg-btn" id="pref-label-tie"     onclick="setPreference('label', 'tie')"     title="Both are equally good">Both</button>
-      <button class="seg-btn" id="pref-label-neither" onclick="setPreference('label', 'neither')" title="Neither is good">Neither</button>
-      <button class="seg-btn" id="pref-label-right"   onclick="setPreference('label', 'right')"   title="Policy B is better">B</button>
-    </div>
-  </div>
-  <div class="ag-cell ag-right" id="ag-label-b"></div>
-  <div class="ag-cell ag-left" id="ag-action-a"></div>
-  <div class="ag-mid">
-    <div class="ag-aspect">Action</div>
-    <div class="seg" role="group" aria-label="Preference: Action">
-      <button class="seg-btn" id="pref-action-left"    onclick="setPreference('action', 'left')"    title="Policy A is better">A</button>
-      <button class="seg-btn" id="pref-action-tie"     onclick="setPreference('action', 'tie')"     title="Both are equally good">Both</button>
-      <button class="seg-btn" id="pref-action-neither" onclick="setPreference('action', 'neither')" title="Neither is good">Neither</button>
-      <button class="seg-btn" id="pref-action-right"   onclick="setPreference('action', 'right')"   title="Policy B is better">B</button>
-    </div>
-  </div>
-  <div class="ag-cell ag-right" id="ag-action-b"></div>
-  <div class="ag-cell ag-left" id="ag-quotes-a"></div>
-  <div class="ag-mid">
-    <div class="ag-aspect">Policy quotes</div>
-    <div class="seg" role="group" aria-label="Preference: Policy quotes">
-      <button class="seg-btn" id="pref-quotes-left"    onclick="setPreference('quotes', 'left')"    title="Policy A is better">A</button>
-      <button class="seg-btn" id="pref-quotes-tie"     onclick="setPreference('quotes', 'tie')"     title="Both are equally good">Both</button>
-      <button class="seg-btn" id="pref-quotes-neither" onclick="setPreference('quotes', 'neither')" title="Neither is good">Neither</button>
-      <button class="seg-btn" id="pref-quotes-right"   onclick="setPreference('quotes', 'right')"   title="Policy B is better">B</button>
-    </div>
-  </div>
-  <div class="ag-cell ag-right" id="ag-quotes-b"></div>
-  <div class="ag-cell ag-left ag-last"><div class="ag-rowtitle">Explanation</div><div id="ag-explain-a" class="ag-explain"></div></div>
-  <div class="ag-mid"></div>
-  <div class="ag-cell ag-right ag-last"><div class="ag-rowtitle">Explanation</div><div id="ag-explain-b" class="ag-explain"></div></div>
-</div>
-
-<div id="vote-action-row" style="display:none;width:100%;max-width:1100px;margin:16px auto 0;">
-  <div id="vote-prior-warning" class="vote-warning" style="display:none">
-    You have already voted on this post — submitting will update your previous vote.
-  </div>
-  <div id="vote-progress" class="ag-hint">Mark all three rows to submit (0 of 3).</div>
-  <div class="vote-buttons">
-    <button id="vote-submit-btn" onclick="submitVote()" disabled>Submit vote</button>
-    <button id="vote-skip-btn" class="btn-skip" onclick="skipVote()">Skip</button>
-  </div>
-</div>
-
-<div style="text-align:center;margin:24px 0;">
-  <button id="reset-btn" onclick="resetSite()"
-    style="display:none;padding:10px 28px;border-radius:10px;border:none;
-           background:#0085ff;color:#fff;font-size:0.95rem;font-weight:600;
-           cursor:pointer;transition:opacity 0.15s;"
-    onmouseover="this.style.opacity='0.85'"
-    onmouseout="this.style.opacity='1'">
-    <i class="fa-solid fa-arrow-up-right-from-square"></i> Next post
-  </button>
-</div>
-
-  
 </div><!-- /main-content -->
 
-<script src="static/config.js"></script>
-<script src="static/static-api.js"></script>
-<script src="static/app.js"></script>
+<script>
+// ── Theme ─────────────────────────────────────────────────
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('theme-btn');
+  btn.querySelector('.sidebar-icon').innerHTML = t === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+  btn.querySelector('.sidebar-label').textContent = t === 'light' ? 'Dark' : 'Light';
+  localStorage.setItem('theme', t);
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+applyTheme(localStorage.getItem('theme') || 'light');
 
-<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal(event)">
-  <div class="modal-box">
-    <div class="modal-header">
-      <span id="modal-title"></span>
-      <button class="theme-btn" onclick="closeModal()">✕</button>
-    </div>
-    <div id="modal-body" class="modal-body"></div>
-  </div>
-</div>
+async function logout() {
+  try { sessionStorage.removeItem('arena_entered'); } catch (e) { /* ignore */ }
+  try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
+  window.location.href = 'login.html';
+}
 
+function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+async function loadMe() {
+  try {
+    const r = await fetch('/api/me');
+    const d = await r.json();
+    if (!r.ok || !d.logged_in) { window.location.href = 'login.html'; return; }
+    document.getElementById('user-info').innerHTML = `<strong>${esc(d.username)}</strong> · ${d.vote_count} vote${d.vote_count === 1 ? '' : 's'}`;
+    document.getElementById('landing-name').textContent =
+      d.vote_count ? `Signed in as ${d.username} — ${d.vote_count} vote${d.vote_count === 1 ? '' : 's'} so far.` : `Signed in as ${d.username}.`;
+    if (d.is_annotator) {
+      document.getElementById('annotate-btn').style.display = '';
+      document.getElementById('annotate-start').style.display = '';
+      try {
+        const s = await (await fetch('/api/annotate/state')).json();
+        document.getElementById('annotate-start-text').textContent =
+          s.done_count >= s.total ? `Annotation — all ${s.total} done` : `Continue annotating (${s.done_count} of ${s.total} done)`;
+      } catch (e) { /* ignore */ }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function loadLanding() {
+  const el = document.getElementById('landing-md');
+  try {
+    const r = await fetch('/api/landing');
+    if (r.status === 401) { window.location.href = 'login.html'; return; }
+    const d = await r.json();
+    el.innerHTML = window.marked ? marked.parse(d.text) : '<pre style="white-space:pre-wrap">' + esc(d.text) + '</pre>';
+  } catch (e) {
+    el.textContent = 'Welcome to the Moderation Arena.';
+  }
+}
+
+loadMe();
+loadLanding();
+</script>
 </body>
 </html>

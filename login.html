@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
+<script src="static/config.js"></script>
+<script src="static/static-api.js"></script>
+<script src="static/ratings.js"></script>
+
+<script>try { sessionStorage.removeItem('arena_entered'); } catch (e) {}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Welcome · Moderation Arena</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏟️</text></svg>">
 <link rel="stylesheet" href="static/auth.css">
+<style>#skip-btn:hover { background: var(--surface) !important; color: var(--text-primary) !important; } #password { width: 100%; }</style>
 </head>
 <body>
   <main class="auth-main">
@@ -17,49 +23,88 @@
       <label for="name">Any name you like</label>
       <input id="name" type="text" maxlength="64" autocomplete="off" autofocus>
 
+      <div id="pw-group" style="display:none">
+        <label for="password">Annotator password</label>
+        <input id="password" type="password" autocomplete="current-password">
+        <p class="auth-sub" style="margin:6px 0 0;text-align:left">Enter the password to open the annotation view, or continue to the arena without it.</p>
+      </div>
+
       <div id="error" class="auth-error" style="display:none"></div>
 
       <button id="submit-btn" type="submit">Continue</button>
+      <button id="skip-btn" type="button" style="display:none;width:100%;margin-top:8px;background:transparent;color:var(--text-muted);border:1px solid var(--input-border)">Continue without password</button>
     </form>
   </div>
   </main>
-  
 
-<script src="static/config.js"></script>
-<script src="static/static-api.js"></script>
 <script>
-const form  = document.getElementById('auth-form');
-const errEl = document.getElementById('error');
-const btn   = document.getElementById('submit-btn');
+const form    = document.getElementById('auth-form');
+const errEl   = document.getElementById('error');
+const btn     = document.getElementById('submit-btn');
+const skipBtn = document.getElementById('skip-btn');
+const nameEl  = document.getElementById('name');
+const pwGroup = document.getElementById('pw-group');
+const pwEl    = document.getElementById('password');
+let askedPassword = false;      // the server asked for the annotator password for this name
 
 function showError(msg) {
   errEl.textContent = msg;
   errEl.style.display = 'block';
 }
 
-async function submit() {
-  const name = document.getElementById('name').value.trim();
-  errEl.style.display = 'none';
-  if (!name) { showError('Please pick a name.'); return; }
+function resetPasswordStep() {
+  askedPassword = false;
+  pwGroup.style.display = 'none';
+  skipBtn.style.display = 'none';
+  pwEl.value = '';
+  btn.textContent = 'Continue';
+}
 
-  btn.disabled = true;
+async function enter(body) {
+  errEl.style.display = 'none';
+  btn.disabled = skipBtn.disabled = true;
   try {
     const resp = await fetch('/api/enter', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(body),
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) { showError(data.detail || 'Could not continue.'); return; }
+    if (data.password_prompt) {           // annotator name: ask for the password (optional)
+      askedPassword = true;
+      pwGroup.style.display = '';
+      skipBtn.style.display = 'block';
+      btn.textContent = 'Sign in as annotator';
+      pwEl.focus();
+      return;
+    }
+    try { sessionStorage.setItem('arena_entered', '1'); } catch (e) { /* ignore */ }
     window.location.href = 'index.html';
   } catch (e) {
     showError('Network error: ' + e.message);
   } finally {
-    btn.disabled = false;
+    btn.disabled = skipBtn.disabled = false;
+  }
+}
+
+function submit() {
+  const name = nameEl.value.trim();
+  if (!name) { showError('Please pick a name.'); return; }
+  if (askedPassword) {
+    if (!pwEl.value) { showError('Enter the password, or continue without it.'); return; }
+    enter({ name, password: pwEl.value });
+  } else {
+    enter({ name });
   }
 }
 
 form.addEventListener('submit', submit);
+skipBtn.addEventListener('click', () => {
+  const name = nameEl.value.trim();
+  if (name) enter({ name, skip_password: true });
+});
+nameEl.addEventListener('input', () => { if (askedPassword) resetPasswordStep(); });   // another name: start over
 </script>
 </body>
 </html>

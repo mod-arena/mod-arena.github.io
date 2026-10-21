@@ -1,7 +1,7 @@
 // ── Policy battle on pre-computed samples ─────────────────
 let _sample       = null;     // payload of the sample on screen ({sample_id, token, post, panels})
 let _seen         = [];       // ids shown in this page session (so Skip does not repeat a post)
-let _prefs        = { label: null, action: null, quotes: null };   // 'left' | 'right' | 'tie' | 'neither'
+let _prefs        = { label: null, action: null };   // 'left' | 'right' | 'tie' | 'neither'
 let _identities   = null;     // {a:{policy,policy_name}, b:{...}} — only known after the vote
 let _voteRevealed = false;
 
@@ -46,10 +46,12 @@ async function loadMe() {
     _voteCount = data.vote_count || 0;
     _username  = data.username || '';
     renderUserInfo();
+    if (data.is_annotator) document.getElementById('annotate-btn').style.display = '';
   } catch (e) { /* ignore: the next request redirects if the session is gone */ }
 }
 
 async function logout() {
+  try { sessionStorage.removeItem('arena_entered'); } catch (e) { /* ignore */ }
   try { await fetch('/api/logout', { method: 'POST' }); } catch (e) { /* ignore */ }
   window.location.href = 'login.html';
 }
@@ -354,13 +356,20 @@ function renderArena(panels) {
       ? `<div class="ag-chips">${d.actions.map(a => `<span class="mod-type-chip">${escHtml(a)}</span>`).join('')}</div>`
       : `<div class="ag-chips"><span class="mod-type-chip none">No action</span></div>`;
 
+  });
+}
+
+// The quotes and explanations are only sent once the vote is cast.
+function renderReveal(details) {
+  ['a', 'b'].forEach(p => {
+    const d = details[p];
     const q = d.policy_quotes || [];
     document.getElementById(`ag-quotes-${p}`).innerHTML = q.length
       ? q.map(x => `<blockquote class="ag-quote">${escHtml(x)}</blockquote>`).join('')
       : `<div class="ag-nochoice">No policy quotes cited.</div>`;
-
     document.getElementById(`ag-explain-${p}`).innerHTML = d.explanation ? escHtml(d.explanation) : '';
   });
+  document.getElementById('arena-reveal').style.display = 'block';
 }
 
 // ── Sample loading ────────────────────────────────────────
@@ -370,6 +379,7 @@ async function loadSample() {
   clearVotingUI();
   document.getElementById('arena-grid').style.display = 'none';
   document.getElementById('arena-hint').style.display = 'none';
+  document.getElementById('arena-reveal').style.display = 'none';
   document.getElementById('reset-btn').style.display = 'none';
   out.innerHTML = '<div class="spinner"></div>';
   try {
@@ -399,7 +409,7 @@ async function loadSample() {
 }
 
 // ── Voting flow ───────────────────────────────────────────
-const _PREF_KEYS = ['label', 'action', 'quotes'];
+const _PREF_KEYS = ['label', 'action'];
 const _PREF_VALS = ['left', 'tie', 'neither', 'right'];
 
 function allAnswered() {
@@ -416,7 +426,7 @@ function setPreference(key, val) {
 function updateVoteProgress() {
   const n = _PREF_KEYS.filter(k => _prefs[k]).length;
   document.getElementById('vote-progress').textContent =
-    n === _PREF_KEYS.length ? 'All three rows marked — you can submit.' : `Mark all three rows to submit (${n} of ${_PREF_KEYS.length}).`;
+    n === _PREF_KEYS.length ? 'Both rows marked — you can submit.' : `Mark both rows to submit (${n} of ${_PREF_KEYS.length}).`;
 }
 
 function highlightPreferences() {
@@ -434,7 +444,7 @@ async function submitVote() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: _sample.token,
-        pref_label: _prefs.label, pref_action: _prefs.action, pref_quotes: _prefs.quotes,
+        pref_label: _prefs.label, pref_action: _prefs.action,
       }),
     });
     if (resp.status === 401) { window.location.href = 'login.html'; return; }
@@ -453,6 +463,7 @@ async function submitVote() {
     }
     _identities = data.identities;
     revealIdentities();
+    renderReveal(data.details);
   } catch (e) {
     alert('Network error: ' + e.message);
     btn.disabled = false;
@@ -479,7 +490,9 @@ function skipVote() {
 }
 
 function clearVotingUI() {
-  _prefs = { label: null, action: null, quotes: null };
+  const reveal = document.getElementById('arena-reveal');     // absent on the annotation page
+  if (reveal) reveal.style.display = 'none';
+  _prefs = { label: null, action: null };
   _identities = null;
   _voteRevealed = false;
   document.getElementById('vote-action-row').style.display = 'none';
@@ -514,4 +527,4 @@ function resetSite() {
   loadSample();
 }
 
-loadSample();
+if (window.ARENA_MODE !== 'annotate') loadSample();

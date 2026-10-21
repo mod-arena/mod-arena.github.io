@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<script src="static/config.js"></script>
+<script src="static/static-api.js"></script>
+<script src="static/ratings.js"></script>
+
+<script>
+// Every visit (new tab or window, or after the browser was closed) starts with the name entry; a reload keeps it.
+try { if (!sessionStorage.getItem('arena_entered')) location.replace('login.html'); } catch (e) { /* storage blocked: the session cookie still protects the API */ }
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leaderboard · Moderation Arena</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+<link rel="stylesheet" href="static/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<style id="col-vis"></style>
+<style>
+  .lb-wrap { width: 100%; max-width: 980px; padding: 0 0 48px; }
+
+  /* ── Nav row (scope + tabs) ── */
+  .lb-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px solid var(--border); margin-bottom: 24px; padding-bottom: 0;
+    flex-wrap: wrap; gap: 8px;
+  }
+
+  /* ── Scope toggle ── */
+  .lb-scope {
+    display: flex; gap: 0;
+    border: 1px solid var(--border); border-radius: 7px;
+    overflow: hidden; width: fit-content; background: var(--bg);
+    margin-bottom: -2px;
+  }
+  .lb-scope-btn {
+    padding: 6px 16px; border: none; border-radius: 0;
+    background: transparent; color: var(--text-muted);
+    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .lb-scope-btn + .lb-scope-btn { border-left: 1px solid var(--border); }
+  .lb-scope-btn.active { background: #0085ff; color: #fff; }
+  .lb-scope-btn:not(.active):hover { background: var(--surface); color: var(--text-primary); }
+  .lb-scope-btn.active:hover, .lb-scope-btn.active:active { background: #0073e0; color: #fff; }
+
+  /* ── Tabs (underline style) ── */
+  .lb-tabs { display: flex; gap: 0; margin-bottom: -2px; }
+  .lb-tab {
+    padding: 8px 18px; border: none; border-bottom: 2px solid transparent;
+    background: transparent; color: var(--text-muted);
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s; border-radius: 0;
+  }
+  .lb-tab.active { color: var(--text-primary); border-bottom-color: #0085ff; }
+  .lb-tab:hover, .lb-tab:active { background: transparent; color: var(--text-primary); }
+
+  /* ── Filters ── */
+  .lb-filters {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 12px; margin-bottom: 20px;
+    padding: 0; background: none;
+    border: none; border-radius: 0;
+  }
+  .lb-filter-group { display: flex; align-items: center; gap: 6px; }
+  .lb-filter-group label { font-size: 0.78rem; color: var(--text-muted); font-weight: 600; white-space: nowrap; }
+  .lb-filter-group select,
+  .lb-filter-group input[type="number"] {
+    padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text-primary);
+    font-size: 0.82rem; outline: none;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .lb-filter-group input[type="number"] { width: 64px; }
+  .lb-filter-group select.lb-filter-active {
+    border-color: #0085ff;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-weight: 600;
+  }
+  [data-theme="dark"] .lb-filter-group select.lb-filter-active {
+    background: #1e3a5f;
+    color: #60a5fa;
+  }
+
+  /* ── Section headings + controls ── */
+  .lb-section { margin-bottom: 36px; }
+  .lb-section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .lb-section-header h2 {
+    font-size: 1rem; font-weight: 700; color: var(--text-primary); margin: 0;
+  }
+  .lb-toggle-btn {
+    padding: 5px 12px; border-radius: 7px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-muted);
+    font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .lb-toggle-btn:hover { border-color: #0085ff; color: #0085ff; background: rgba(0,133,255,0.08); }
+  .lb-toggle-btn.open  { border-color: #0085ff; color: #0085ff; background: rgba(0,133,255,0.14); }
+  .lb-toggle-btn.active { border-color: #0085ff; color: var(--text-muted); }
+
+  /* ── Column picker dropdown ── */
+  .col-picker-wrap { position: relative; }
+  .col-picker-dropdown {
+    display: none;
+    position: absolute;
+    right: 0; top: calc(100% + 4px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 4px;
+    z-index: 100;
+    min-width: 170px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  .col-picker-dropdown.open { display: block; }
+  .col-picker-dropdown label {
+    display: block;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    color: var(--text-body);
+    border-radius: 4px;
+    transition: background 0.1s;
+    white-space: nowrap;
+    text-align: left;
+  }
+  .col-picker-dropdown label:hover { background: var(--bg); }
+  .col-picker-dropdown input[type="checkbox"] {
+    cursor: pointer; accent-color: #0085ff;
+    margin: 0 7px 0 0;
+    vertical-align: middle;
+  }
+
+  /* ── Rankings table ── */
+  .lb-scroll { overflow-x: auto; }
+  table.lb {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    font-size: 0.86rem; min-width: 420px;
+  }
+  table.lb th, table.lb td {
+    padding: 10px 14px; text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  table.lb th {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-muted); font-weight: 700; white-space: nowrap;
+  }
+  table.lb td { color: var(--text-body); }
+  table.lb td.rank { color: var(--text-muted); font-weight: 700; font-size: 0.9rem; width: 36px; }
+  table.lb td.name { color: var(--text-primary); font-weight: 600; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  table.lb td.score { font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .score-ci { font-size: 0.75em; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+  table.lb td.num, table.lb th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.lb tr:last-child td { border-bottom: none; }
+  .lb-empty { color: var(--text-muted); font-size: 0.88rem; padding: 12px 0; }
+
+  /* ── H2H caption ── */
+  .h2h-caption {
+    font-size: 0.78rem; color: var(--text-muted);
+    margin: -8px 0 10px; line-height: 1.4;
+  }
+
+  /* ── Head-to-head ── */
+  .h2h-scroll { overflow-x: auto; }
+  table.h2h {
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    font-size: 0.8rem;
+  }
+  table.h2h th, table.h2h td {
+    padding: 8px 12px; text-align: center;
+    border: 1px solid var(--border);
+    min-width: 80px; white-space: nowrap;
+  }
+  table.h2h th { font-weight: 700; color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; }
+  table.h2h th.h2h-corner { font-size: 0.68rem; color: var(--text-muted); opacity: 0.7; font-style: italic; text-transform: none; font-weight: 600; }
+  table.h2h td.h2h-label { text-align: left; font-weight: 700; color: var(--text-muted); background: var(--surface); font-size: 0.72rem; text-transform: uppercase; }
+  table.h2h td.h2h-diag { background: var(--bg); color: var(--text-muted); }
+  table.h2h td.h2h-empty { color: var(--text-muted); background: var(--bg); opacity: 0.5; }
+
+  /* ── Collapsible annotators ── */
+  details.lb-annotators { margin-bottom: 36px; }
+  details.lb-annotators summary {
+    cursor: pointer; list-style: none;
+    font-size: 1rem; font-weight: 700; color: var(--text-primary);
+    display: flex; align-items: center; gap: 0; padding: 4px 0;
+    user-select: none;
+  }
+  details.lb-annotators summary::-webkit-details-marker { display: none; }
+  details.lb-annotators summary::before {
+    content: '▶'; font-size: 0.6em; color: var(--text-muted);
+    display: inline-block; margin-right: 8px;
+    transition: transform 0.2s;
+  }
+  details.lb-annotators[open] summary::before { transform: rotate(90deg); }
+  details.lb-annotators .lb-scroll { margin-top: 12px; }
+
+  /* ── Annotators ── */
+  table.lb-users { min-width: 280px; }
+
+  /* ── Guest banner ── */
+  .guest-banner {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+    padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;
+    background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af;
+    font-size: 0.85rem; line-height: 1.5;
+  }
+  [data-theme="dark"] .guest-banner {
+    background: #1e3a5f; border-color: #1d4ed8; color: #93c5fd;
+  }
+  .guest-banner-text { flex: 1; min-width: 0; }
+  .guest-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .guest-banner-btn {
+    padding: 6px 14px; border-radius: 7px; font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; white-space: nowrap; text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .guest-banner-btn-primary {
+    background: #0085ff; color: #fff; border: 1px solid #0085ff;
+  }
+  .guest-banner-btn-primary:hover { background: #0073e0; border-color: #0073e0; }
+  .guest-banner-btn-outline {
+    background: transparent; color: #0085ff; border: 1px solid #0085ff;
+  }
+  [data-theme="dark"] .guest-banner-btn-outline { color: #60a5fa; border-color: #60a5fa; }
+  .guest-banner-btn-outline:hover { background: #0085ff1a; }
+
+  /* ── Demo additions ── */
+  .lb-note { font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: -12px 0 20px; }
+  .lb-group + .lb-group { margin-top: 22px; }
+  .lb-group-title { font-size: 0.82rem; font-weight: 700; color: var(--text-muted); margin: 0 0 8px;
+                    text-transform: uppercase; letter-spacing: 0.05em; }
+</style>
+</head>
+<body>
+
+<!-- Left sidebar -->
+<div class="sidebar" id="sidebar">
+  <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+    <span class="sidebar-toggle-icon">‹</span>
+  </button>
+
+  <div class="sidebar-top">
+    <a class="sidebar-btn" href="index.html" title="Home">
+      <span class="sidebar-icon"><i class="fa-solid fa-house"></i></span>
+      <span class="sidebar-label">Home</span>
+    </a>
+    <a class="sidebar-btn" href="arena.html" title="New Post">
+      <span class="sidebar-icon"><i class="fa-solid fa-comment-medical"></i></span>
+      <span class="sidebar-label">New Post</span>
+    </a>
+    <a class="sidebar-btn active" href="leaderboard.html" title="Leaderboard">
+      <span class="sidebar-icon"><i class="fa-solid fa-ranking-star"></i></span>
+      <span class="sidebar-label">Leaderboard</span>
+    </a>
+    <a class="sidebar-btn" id="annotate-btn" href="annotate.html" title="Annotate" style="display:none">
+      <span class="sidebar-icon"><i class="fa-solid fa-list-check"></i></span>
+      <span class="sidebar-label">Annotate</span>
+    </a>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div class="sidebar-user">
+      <span id="user-info" class="user-info"></span>
+    </div>
+    <button class="sidebar-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">
+      <span class="sidebar-icon"><i class="fa-solid fa-moon"></i></span>
+      <span class="sidebar-label">Dark</span>
+    </button>
+    <button class="sidebar-btn" onclick="downloadVotes()" title="Download votes">
+      <span class="sidebar-icon"><i class="fa-solid fa-download"></i></span>
+      <span class="sidebar-label">Download votes</span>
+    </button>
+    <button class="sidebar-btn" id="logout-btn" onclick="logout()" title="Change name">
+      <span class="sidebar-icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+      <span class="sidebar-label">Change name</span>
+    </button>
+  </div>
+</div>
+<script>
+(function() {
+  const _hasSess = document.cookie.split(';').some(c => c.trim().startsWith('arena_has_session='));
+  const _pref    = localStorage.getItem('sidebar_collapsed');
+  if (_hasSess ? _pref !== '0' : _pref === '1') {
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.querySelector('.sidebar-toggle-icon').textContent = '›';
+  }
+})();
+function toggleSidebar() {
+  const s = document.getElementById('sidebar');
+  const collapsed = s.classList.toggle('collapsed');
+  document.querySelector('.sidebar-toggle-icon').textContent = collapsed ? '›' : '‹';
+  localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0');
+}
+</script>
+
+<!-- Main content -->
+<div class="main-content">
+
+<div class="topbar">
+  <h1 class="topbar-wordmark">🏟️ Moderation Arena</h1>
+</div>
+
+<div class="lb-wrap">
+
+  <!-- Nav: scope + tabs in one row -->
+  <div class="lb-nav">
+    <div class="lb-scope">
+      <button class="lb-scope-btn active" id="scope-overall" onclick="switchScope('overall')">Overall</button>
+      <button class="lb-scope-btn"        id="scope-mine"    onclick="switchScope('mine')">Mine</button>
+    </div>
+    <div class="lb-tabs">
+      <button class="lb-tab active" id="tab-label"  onclick="switchTab('label')">Label</button>
+      <button class="lb-tab"        id="tab-action" onclick="switchTab('action')">Action</button>
+    </div>
+  </div>
+
+  <p class="lb-note">Each vote compares two platform policies on the same post: one that flagged it and one that judged it safe.
+    A <strong>win</strong> means annotators preferred that policy's <span id="aspect-word">label</span>. The demo pairs
+    Bluesky with X and TikTok with Snap, so each pair is ranked on its own.</p>
+
+  <!-- Filters -->
+  <div class="lb-filters">
+    <div class="lb-filter-group">
+      <label>Content:</label>
+      <select id="content-sel" onchange="onFilterChange()">
+        <option value="">All</option>
+        <option value="image">Image</option>
+        <option value="video">Video</option>
+        <option value="text">Text</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Rankings -->
+  <div class="lb-section">
+    <div class="lb-section-header">
+      <h2 id="rankings-title">Policy Rankings — Label</h2>
+      <div class="col-picker-wrap" id="col-picker-wrap">
+        <button class="lb-toggle-btn" id="col-picker-btn" onclick="toggleColPicker()">Columns ▾</button>
+        <div class="col-picker-dropdown" id="col-picker-dropdown"></div>
+      </div>
+    </div>
+    <div class="lb-scroll">
+      <div id="rankings-wrap"></div>
+    </div>
+  </div>
+
+  <!-- Head-to-head -->
+  <div class="lb-section" id="h2h-section">
+    <div class="lb-section-header">
+      <h2 id="h2h-title">Policy Head-to-head</h2>
+    </div>
+    <p class="h2h-caption">Each cell shows the <strong>row</strong> policy's win rate against the <strong>column</strong> policy (ties excluded). A dot means the two were never compared.</p>
+    <div class="h2h-scroll">
+      <div id="h2h-wrap"></div>
+    </div>
+  </div>
+
+  <!-- Pairwise Battle Counts -->
+  <div class="lb-section" id="battle-count-section">
+    <div class="lb-section-header">
+      <h2 id="battle-count-title">Pairwise Battle Counts</h2>
+      <div class="lb-scope">
+        <button class="lb-scope-btn active" id="bc-mode-decisive" onclick="switchBattleCountMode('decisive')">Decisive</button>
+        <button class="lb-scope-btn"        id="bc-mode-all"      onclick="switchBattleCountMode('all')">All</button>
+      </div>
+    </div>
+    <p class="h2h-caption" id="battle-count-caption"></p>
+    <div class="h2h-scroll">
+      <div id="battle-count-wrap"></div>
+    </div>
+  </div>
+
+</div><!-- /lb-wrap -->
+</div><!-- /main-content -->
+
+<script>
+// ── Theme ────────────────────────────────────────────────────────────────────
+const LABELS = { light: '🌙 Dark', dark: '☀️ Light' };
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('theme-btn');
+  const icon = btn.querySelector('.sidebar-icon');
+  const label = btn.querySelector('.sidebar-label');
+  if (icon && label) {
+    icon.innerHTML = t === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+    label.textContent = t === 'light' ? 'Dark' : 'Light';
+  } else {
+    btn.textContent = LABELS[t];
+  }
+  localStorage.setItem('theme', t);
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+applyTheme(localStorage.getItem('theme') || 'light');
+
+async function logout() {
+  try { sessionStorage.removeItem('arena_entered'); } catch(e) {}
+  try { await fetch('/api/logout', { method: 'POST' }); } catch(e) {}
+  window.location.href = 'login.html';
+}
+
+
+// ── User ──────────────────────────────────────────────────────────────────
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+async function loadUserInfo() {
+  try {
+    const r = await fetch('/api/me');
+    const d = await r.json();
+    if (!r.ok || !d.logged_in) { window.location.href = 'login.html'; return; }
+    const el = document.getElementById('user-info');
+    if (el) el.innerHTML = `<strong>${esc(d.username)}</strong> · ${d.vote_count} vote${d.vote_count === 1 ? '' : 's'}`;
+    if (d.is_annotator) document.getElementById('annotate-btn').style.display = '';
+  } catch (e) { /* ignore */ }
+}
+loadUserInfo();
+
+function pct(x) {
+  return (x === null || x === undefined) ? '—' : (x * 100).toFixed(1) + '%';
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+let _aspect           = 'label';
+let _personalized     = false;
+let _lastData         = null;
+let _battleCountMode  = 'decisive';
+
+// ── Column visibility ─────────────────────────────────────────────────────────
+const _COLS = [
+  { id: 'rspread', label: 'Rank spread',    on: true  },
+  { id: 'battles', label: 'Battles',        on: true  },
+  { id: 'winpct',  label: 'Win %',          on: false },
+  { id: 'losspct', label: 'Loss %',         on: false },
+  { id: 'tiepct',  label: 'Tie %',          on: false },
+  { id: 'bbpct',   label: 'Neither %',       on: false },
+  { id: 'counts',  label: 'W / L / T / N',  on: false },
+];
+
+function updateColVis() {
+  const rules = _COLS.map(c =>
+    `.col-${c.id} { display: ${c.on ? 'table-cell' : 'none'}; }`
+  ).join('\n');
+  document.getElementById('col-vis').textContent = rules;
+  const _defaultCols = new Set(['rspread', 'battles']);
+  const hasExtra = _COLS.some(c => c.on && !_defaultCols.has(c.id));
+  document.getElementById('col-picker-btn').classList.toggle('active', hasExtra);
+}
+
+let _colPickerOpen = false;
+
+function toggleColPicker() {
+  _colPickerOpen = !_colPickerOpen;
+  document.getElementById('col-picker-dropdown').classList.toggle('open', _colPickerOpen);
+  document.getElementById('col-picker-btn').classList.toggle('open', _colPickerOpen);
+}
+
+function onColToggle(id, checked) {
+  const col = _COLS.find(c => c.id === id);
+  if (col) col.on = checked;
+  updateColVis();
+}
+
+function initColPicker() {
+  const dd = document.getElementById('col-picker-dropdown');
+  dd.innerHTML = _COLS.map(c => `
+    <label>
+      <input type="checkbox" ${c.on ? 'checked' : ''}
+             onchange="onColToggle('${c.id}', this.checked)">
+      ${c.label}
+    </label>`).join('');
+  updateColVis();
+}
+
+document.addEventListener('click', e => {
+  if (_colPickerOpen && !document.getElementById('col-picker-wrap').contains(e.target)) {
+    _colPickerOpen = false;
+    document.getElementById('col-picker-dropdown').classList.remove('open');
+    document.getElementById('col-picker-btn').classList.remove('open');
+  }
+});
+
+
+function updateFilterHighlights() {
+  const el = document.getElementById('content-sel');
+  el.classList.toggle('lb-filter-active', !!el.value);
+}
+
+// ── Scope / tab / filter handlers ─────────────────────────────────────────
+function switchScope(scope) {
+  _personalized = scope === 'mine';
+  document.getElementById('scope-overall').classList.toggle('active', !_personalized);
+  document.getElementById('scope-mine').classList.toggle('active', _personalized);
+  load();
+}
+function switchBattleCountMode(mode) {
+  _battleCountMode = mode;
+  document.getElementById('bc-mode-decisive').classList.toggle('active', mode === 'decisive');
+  document.getElementById('bc-mode-all').classList.toggle('active', mode === 'all');
+  if (_lastData) renderBattleCount(_lastData.head_to_head);
+}
+function switchTab(aspect) {
+  _aspect = aspect;
+  const A = aspect === 'label' ? 'Label' : 'Action';
+  document.getElementById('tab-label').classList.toggle('active',  aspect === 'label');
+  document.getElementById('tab-action').classList.toggle('active', aspect === 'action');
+  document.getElementById('rankings-title').textContent = `Policy Rankings — ${A}`;
+  document.getElementById('h2h-title').textContent = `Policy Head-to-head — ${A}`;
+  document.getElementById('battle-count-title').textContent = `Pairwise Battle Counts — ${A}`;
+  document.getElementById('aspect-word').textContent = aspect;
+  load();
+}
+function onFilterChange() {
+  updateFilterHighlights();
+  load();
+}
+
+// ── Load data ─────────────────────────────────────────────────────────────
+async function load() {
+  const content = document.getElementById('content-sel').value;
+  const params = new URLSearchParams({ aspect: _aspect });
+  if (content) params.set('content_type_filter', content);
+  if (_personalized) params.set('personalized', 'true');
+  try {
+    const resp = await fetch('/api/leaderboard?' + params);
+    if (resp.status === 401) { window.location.href = 'login.html'; return; }
+    if (!resp.ok) return;
+    const data = await resp.json();
+    _lastData = data;
+    renderRankings(data.groups);
+    renderH2H(data.head_to_head);
+    renderBattleCount(data.head_to_head);
+  } catch (e) {
+    document.getElementById('rankings-wrap').innerHTML =
+      '<div class="lb-empty">Failed to load leaderboard.</div>';
+  }
+}
+
+// ── Rankings tables (one per group of policies that were compared with each other) ─────────
+function rankingsTable(rows) {
+  const body = rows.map(r => `
+    <tr>
+      <td class="rank">${r.rank}</td>
+      <td class="name" title="${esc(r.name)}">${esc(r.name)}</td>
+      <td class="score num">${r.bt_score}<span class="score-ci"> ±${r.score_ci}</span></td>
+      <td class="num col-rspread">${r.rank_lo === r.rank_hi ? r.rank_lo : r.rank_lo + '–' + r.rank_hi}</td>
+      <td class="num col-battles">${r.battles}</td>
+      <td class="num col-winpct">${pct(r.win_rate)}</td>
+      <td class="num col-losspct">${pct(r.loss_rate)}</td>
+      <td class="num col-tiepct">${pct(r.tie_rate)}</td>
+      <td class="num col-bbpct">${pct(r.both_bad_rate)}</td>
+      <td class="num col-counts">${r.wins} / ${r.losses} / ${r.ties} / ${r.both_bad}</td>
+    </tr>`).join('');
+  return `
+    <table class="lb rankings">
+      <thead><tr>
+        <th>#</th>
+        <th>Policy</th>
+        <th class="num">Score</th>
+        <th class="num col-rspread" title="95% CI width of rank across bootstrap samples">Rank spread</th>
+        <th class="num col-battles" title="Number of battles this policy appeared in">Battles</th>
+        <th class="num col-winpct">Win %</th>
+        <th class="num col-losspct">Loss %</th>
+        <th class="num col-tiepct">Tie %</th>
+        <th class="num col-bbpct">Neither %</th>
+        <th class="num col-counts">W / L / T / N</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+function renderRankings(groups) {
+  const wrap = document.getElementById('rankings-wrap');
+  if (!groups || !groups.length) {
+    wrap.innerHTML = '<div class="lb-empty">No votes recorded yet.</div>';
+    return;
+  }
+  wrap.innerHTML = groups.map(g => `
+    <div class="lb-group">
+      <div class="lb-group-title">${esc(g.name)}</div>
+      ${rankingsTable(g.rows)}
+    </div>`).join('');
+}
+
+// ── Head-to-head / battle counts ──────────────────────────────────────────
+function policyNames(h2h) {
+  return [...new Set(h2h.flatMap(p => [p.a, p.b]))].sort();
+}
+
+function h2hBg(winRate) {
+  if (winRate === null) return '';
+  if (winRate > 0.5) {
+    const t = (winRate - 0.5) * 2;
+    return `background:rgba(34,197,94,${(0.12 + t * 0.45).toFixed(2)})`;
+  } else if (winRate < 0.5) {
+    const t = (0.5 - winRate) * 2;
+    return `background:rgba(239,68,68,${(0.12 + t * 0.45).toFixed(2)})`;
+  }
+  return '';
+}
+
+function renderH2H(h2h) {
+  const wrap = document.getElementById('h2h-wrap');
+  const sec  = document.getElementById('h2h-section');
+
+  if (!h2h || !h2h.length) {
+    sec.style.display = 'none';
+    return;
+  }
+  sec.style.display = '';
+
+  const names = policyNames(h2h);
+
+  const map = {};
+  for (const pair of h2h) {
+    map[`${pair.a}|${pair.b}`] = pair;
+    map[`${pair.b}|${pair.a}`] = {
+      a: pair.b, b: pair.a,
+      a_wins: pair.b_wins, b_wins: pair.a_wins,
+      ties: pair.ties, both_bad: pair.both_bad, total: pair.total,
+    };
+  }
+
+  const shortName = n => n.length > 22 ? n.slice(0, 20) + '…' : n;
+
+  const headerCells = names.map(n => `<th title="${esc(n)}">${esc(shortName(n))}</th>`).join('');
+  const bodyRows = names.map(rowName => {
+    const cells = names.map(colName => {
+      if (rowName === colName) return `<td class="h2h-diag">—</td>`;
+      const pair = map[`${rowName}|${colName}`];
+      if (!pair) return `<td class="h2h-empty">·</td>`;
+      const decisive = pair.a_wins + pair.b_wins;
+      if (decisive === 0) return `<td class="h2h-empty">·</td>`;
+      const winRate = pair.a_wins / decisive;
+      const tooltip = `${esc(rowName)} vs ${esc(colName)}: ${pair.a_wins}W ${pair.b_wins}L (${pair.ties}T ${pair.both_bad}N excluded)`;
+      return `<td style="${h2hBg(winRate)}" title="${tooltip}">${(winRate * 100).toFixed(0)}%</td>`;
+    }).join('');
+    return `<tr><td class="h2h-label" title="${esc(rowName)}">${esc(shortName(rowName))}</td>${cells}</tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table class="h2h">
+      <thead><tr><th class="h2h-corner">↓ win % vs →</th>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+}
+
+function battleCountBg(count, maxCount) {
+  if (!maxCount || count === 0) return '';
+  const t = count / maxCount;
+  return `background:rgba(59,130,246,${(0.08 + t * 0.5).toFixed(2)})`;
+}
+
+function renderBattleCount(h2h) {
+  const wrap = document.getElementById('battle-count-wrap');
+  const sec  = document.getElementById('battle-count-section');
+
+  if (!h2h || !h2h.length) {
+    sec.style.display = 'none';
+    return;
+  }
+  sec.style.display = '';
+
+  const names = policyNames(h2h);
+
+  const map = {};
+  for (const pair of h2h) {
+    map[`${pair.a}|${pair.b}`] = pair;
+    map[`${pair.b}|${pair.a}`] = {
+      a: pair.b, b: pair.a,
+      a_wins: pair.b_wins, b_wins: pair.a_wins,
+      ties: pair.ties, both_bad: pair.both_bad, total: pair.total,
+    };
+  }
+
+  const showAll = _battleCountMode === 'all';
+  document.getElementById('battle-count-caption').innerHTML = showAll
+    ? 'Each cell shows the <strong>total</strong> number of battles (including ties) between the <strong>row</strong> and <strong>column</strong> policy.'
+    : 'Each cell shows the number of <strong>decisive</strong> battles (wins only, ties excluded) between the <strong>row</strong> and <strong>column</strong> policy.';
+
+  let maxCount = 0;
+  for (const pair of h2h) {
+    maxCount = Math.max(maxCount, showAll ? pair.total : pair.a_wins + pair.b_wins);
+  }
+
+  const shortName = n => n.length > 22 ? n.slice(0, 20) + '…' : n;
+
+  const headerCells = names.map(n => `<th title="${esc(n)}">${esc(shortName(n))}</th>`).join('');
+  const bodyRows = names.map(rowName => {
+    const cells = names.map(colName => {
+      if (rowName === colName) return `<td class="h2h-diag">—</td>`;
+      const pair = map[`${rowName}|${colName}`];
+      if (!pair) return `<td class="h2h-empty">·</td>`;
+      const count = showAll ? pair.total : pair.a_wins + pair.b_wins;
+      if (count === 0) return `<td class="h2h-empty">0</td>`;
+      const tooltip = showAll
+        ? `${esc(rowName)} vs ${esc(colName)}: ${pair.a_wins}W ${pair.b_wins}L ${pair.ties}T ${pair.both_bad}N (${pair.total} total)`
+        : `${esc(rowName)} vs ${esc(colName)}: ${pair.a_wins}W ${pair.b_wins}L (${pair.ties}T ${pair.both_bad}N excluded)`;
+      return `<td style="${battleCountBg(count, maxCount)}" title="${tooltip}">${count}</td>`;
+    }).join('');
+    return `<tr><td class="h2h-label" title="${esc(rowName)}">${esc(shortName(rowName))}</td>${cells}</tr>`;
+  }).join('');
+
+  const cornerLabel = showAll ? 'all battles' : 'decisive battles';
+  wrap.innerHTML = `
+    <table class="h2h">
+      <thead><tr><th class="h2h-corner">${cornerLabel}</th>${headerCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+}
+
+
+initColPicker();
+switchTab('label');
+</script>
+</body>
+</html>

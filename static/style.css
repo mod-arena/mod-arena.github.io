@@ -1581,3 +1581,50 @@
   .transcript-box .post-text { margin-bottom: 10px; font-size: 0.92rem; }
 
   #vote-progress { margin: 0 auto 10px; }
+
+  /* ── Annotation view: progress row (demo) ───────────────────── */
+
+  .ann-progress {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 1100px;
+    margin: 14px auto 4px;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .ann-title {
+    flex: none;
+    font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted); white-space: nowrap;
+  }
+  .ann-strip-wrap { position: relative; flex: 1; min-width: 120px; }
+  .ann-strip {
+    display: flex; gap: 0; height: 10px; border-radius: 5px; overflow: hidden;
+    background: var(--border); cursor: pointer;
+  }
+  .ann-strip i { flex: 1 1 0; min-width: 0; background: transparent; pointer-events: none; }
+  .ann-strip i.done { background: #22a06b; }
+  .ann-strip i.cur  { background: #0085ff; }
+  .ann-tip {
+    display: none; position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%);
+    padding: 3px 8px; border-radius: 6px; font-size: 0.74rem; white-space: nowrap; pointer-events: none;
+    background: #1b1f27; color: #fff;
+  }
+  .ann-stats { flex: none; font-size: 0.86rem; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .ann-stats strong { color: var(--text-primary); }
+  .ann-nav { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+  .ann-nav-btn {
+    width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-body); font-size: 1.05rem; line-height: 1; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .ann-nav-btn:hover { border-color: var(--border-hover); background: var(--surface); }
+  .ann-pos { font-size: 0.8rem; color: var(--text-muted); min-width: 92px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 760px) {
+    .ann-progress { flex-wrap: wrap; gap: 8px 12px; }
+    .ann-strip-wrap { order: 3; flex: 1 1 100%; }
+  }
