@@ -68,18 +68,27 @@
       await db.collection('battles').doc(`${uid}__${row.sample_id}`).set({ uid, ...pub });
     } catch (e) { console.warn('vote not saved remotely', e); }
   }
+  // Everyone's anonymous votes. Stale-while-revalidate: the last copy (kept in localStorage) is returned at once and
+  // refreshed in the background, so the leaderboard does not wait for Firebase to load and answer.
   let battles = null, battlesAt = 0;
-  async function globalBattles() {                               // rows of everyone, or null when Firestore is not configured / unreachable
+  async function refreshBattles() {
+    battlesAt = Date.now();                                      // throttle: one refresh per minute at most
     const db = await firestore();
-    if (!db) return null;
-    if (battles && Date.now() - battlesAt < 60000) return battles;
+    if (!db) return battles;
     try {
       const snap = await db.collection('battles').get();
       battles = snap.docs.map(d => d.data());
-      battlesAt = Date.now();
-      return battles;
-    } catch (e) { return battles; }
+      try { lset('arena_battles_cache', { rows: battles }); } catch (e) { /* storage full or blocked */ }
+    } catch (e) { /* keep what we have */ }
+    return battles;
   }
+  async function globalBattles() {                               // rows of everyone, or null when Firestore is not configured
+    if (!window.FIREBASE_CONFIG) return null;
+    if (!battles) { const c = lget('arena_battles_cache', null); if (c && c.rows) battles = c.rows; }
+    if (battles) { if (Date.now() - battlesAt > 60000) refreshBattles(); return battles; }
+    return refreshBattles();
+  }
+  if (window.FIREBASE_CONFIG) firestore();                       // start loading the Firebase SDK while the page renders
 
   window.downloadVotes = function () {
     const blob = new Blob([JSON.stringify({ reviewer: user(), votes: user() ? rowsOf(votes()) : [] }, null, 2)], { type: 'application/json' });
@@ -211,7 +220,7 @@
       const mine = effective(rowsOf(votes()));
       const all = personal ? mine : effective((await globalBattles()) || mine);   // without Firestore: only this browser's votes
       const rows = ctype ? all.filter(r => types[r.sample_id] === ctype) : all;
-      const res = window.computeLeaderboard(rows, aspect, p => POLICY_NAME[p] || p, 1, 500);
+      const res = window.computeLeaderboard(rows, aspect, p => POLICY_NAME[p] || p, 1, 200);
       res.available_content_types = [...new Set(effective((await globalBattles()) || mine).map(r => types[r.sample_id]).filter(Boolean))].sort();
       return reply(res);
     }
