@@ -347,6 +347,43 @@ function toggleSidebar() {
     </div>
   </div>
 
+  <!-- interface adj: description of the measures -->
+  <div class="lb-section">
+    <details class="lb-measures" open>
+      <summary>What do these measures mean?</summary>
+      <dl>
+        <dt>Score</dt>
+        <dd>Strength of the policy from all votes, as a Bradley&#8209;Terry rating on an Elo-like scale (the same method as the Chatbot Arena leaderboard).
+            Each vote is a pairwise comparison; the median policy is set to 1000, and a 400-point lead means the higher policy wins about 10 of every 11 votes
+            against the lower one (odds of 10 to 1). A <em>Both</em> or <em>Neither</em> vote counts as half a win and half a loss for each policy. Label and Action are rated separately, so their scores are not comparable with each other.</dd>
+        <dt>&plusmn; (score interval)</dt>
+        <dd>Half the width of the 95% bootstrap interval of the score: the votes are resampled 500 times and the ratings refitted. A small &plusmn; means the score is stable, a large one that it depends on a few votes.</dd>
+        <dt>Rank spread</dt>
+        <dd>The range (95%) of the policy's rank over the same resamples, e.g. <em>2&ndash;4</em>: its rank could plausibly be anywhere from 2nd to 4th. A single number means the rank was stable.</dd>
+        <dt>Battles</dt>
+        <dd>How many votes the policy was part of (each vote compares two policies on the label and again on the action).</dd>
+        <dt>Win %, Loss %</dt>
+        <dd>Among the decisive votes only (ties and <em>Neither</em> left out): the share in which the policy was preferred, or not preferred.</dd>
+        <dt>Tie %, Neither %</dt>
+        <dd>Of all the policy's battles, the share voted <em>Both</em> (equally good) or <em>Neither</em> (neither is good). <strong>W / L / T / N</strong> shows the raw counts: wins, losses, ties, neither.</dd>
+        <dt>Head-to-head</dt>
+        <dd>The row policy's win rate against the column policy among decisive votes, coloured green (above 50%) or red (below). A dot means the two were never compared.</dd>
+        <dt>Pairwise battle counts</dt>
+        <dd>How many votes compared each pair of policies: <em>Decisive</em> counts only votes with a winner, <em>All</em> also counts ties and <em>Neither</em>.</dd>
+        <dt>Overall and Mine</dt>
+        <dd><em>Overall</em> combines the annotators' votes with every visitor's votes, and lists a policy once it has at least 5 battles. <em>Mine</em> uses only your own votes from this browser and lists a policy from its first vote; with fewer than 30 votes the scores are rough and the intervals wide, since a small prior keeps them finite. The <em>Content</em> filter restricts the votes to image, video or text posts.</dd>
+      </dl>
+    </details>
+  </div>
+  <style>
+    .lb-measures { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px; }
+    .lb-measures summary { cursor: pointer; font-weight: 700; color: var(--text-primary); font-size: 0.95rem; }
+    .lb-measures dl { margin: 12px 0 2px; display: grid; grid-template-columns: max-content 1fr; gap: 8px 18px; font-size: 0.86rem; line-height: 1.55; color: var(--text-body); }
+    .lb-measures dt { font-weight: 700; color: var(--text-primary); }
+    .lb-measures dd { margin: 0; }
+    @media (max-width: 700px) { .lb-measures dl { grid-template-columns: 1fr; gap: 2px; } .lb-measures dd { margin-bottom: 8px; } }
+  </style>
+
   <!-- Head-to-head -->
   <div class="lb-section">
     <div class="lb-section-header">
