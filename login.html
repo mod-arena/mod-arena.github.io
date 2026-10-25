@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<script>try { sessionStorage.removeItem('arena_entered'); } catch (e) {}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome · Moderation Arena</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏟️</text></svg>">
+<link rel="stylesheet" href="static/auth.css">
+<style>
+  .name-row { display: flex; gap: 8px; }
+  .name-row input { flex: 1; min-width: 0; }
+  #dice-btn { width: auto; padding: 0 14px; margin: 0; white-space: nowrap; background: transparent; color: var(--text-primary);
+              border: 1px solid var(--input-border); cursor: pointer; border-radius: 8px; font: inherit; }
+  #dice-btn:hover { background: var(--surface); }
+</style>
+</head>
+<body>
+  <main class="auth-main">
+  <div class="auth-card">
+    <h1>Moderation Arena</h1>
+    <p class="auth-sub">You are anonymous. Press <strong>🎲 Random name</strong> for a made-up name, or type any name you like (not your real name). Your votes are saved under it in this browser.</p>
+
+    <form id="auth-form" onsubmit="return false;">
+      <label for="name">Your (made-up) name</label>
+      <div class="name-row">
+        <input id="name" type="text" maxlength="64" autocomplete="off" autofocus>
+        <button id="dice-btn" type="button" title="Pick a random name">🎲 Random name</button>
+      </div>
+
+      <div id="error" class="auth-error" style="display:none"></div>
+
+      <button id="submit-btn" type="submit">Continue</button>
+    </form>
+  </div>
+  </main>
+
+<script src="static/config.js"></script>
+<script src="static/ratings.js"></script>
+<script src="static/static-api.js"></script>
+<script>
+const ADJ = ['Amber','Brave','Calm','Clever','Crimson','Daring','Eager','Fuzzy','Gentle','Golden','Happy','Jolly','Keen','Lucky','Mellow','Nimble',
+             'Quiet','Rapid','Silent','Sunny','Swift','Teal','Vivid','Witty','Zesty','Cosmic','Misty','Plucky','Radiant','Snowy'];
+const NOUN = ['Otter','Falcon','Panda','Lynx','Heron','Badger','Koala','Maple','Comet','Willow','Fox','Owl','Pebble','Raven','Tiger','Walrus',
+              'Yak','Aspen','Brook','Cedar','Dolphin','Ember','Finch','Gecko','Ibis','Jaguar','Kiwi','Lotus','Moose','Newt'];
+const pick = a => a[crypto.getRandomValues(new Uint32Array(1))[0] % a.length];
+const randomName = () => `${pick(ADJ)}-${pick(NOUN)}-${100 + crypto.getRandomValues(new Uint32Array(1))[0] % 900}`;
+
+const form = document.getElementById('auth-form'), errEl = document.getElementById('error'),
+      btn = document.getElementById('submit-btn'), nameEl = document.getElementById('name');
+nameEl.value = randomName();
+document.getElementById('dice-btn').addEventListener('click', () => { nameEl.value = randomName(); nameEl.focus(); });
+
+function showError(msg) { errEl.textContent = msg; errEl.style.display = 'block'; }
+
+async function submit() {
+  const name = nameEl.value.trim();
+  errEl.style.display = 'none';
+  if (!name) { showError('Please press "Random name" or type a name.'); return; }
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/enter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) { showError(data.detail || 'Could not continue.'); return; }
+    try { sessionStorage.setItem('arena_entered', '1'); } catch (e) { /* ignore */ }
+    window.location.href = 'index.html';
+  } catch (e) {
+    showError('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+form.addEventListener('submit', submit);
+</script>
+</body>
+</html>
