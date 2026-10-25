@@ -17,6 +17,7 @@
   const CFG = () => window.FIREBASE_CONFIG;
   const ASPECTS = ['label', 'action'];
   const MIN_VOTES_FOR_BOOTSTRAP = 30;   // "Mine": below this many votes use the prior + Poisson bootstrap, from here the normal bootstrap
+  const LB_VERSION = 'v3';              // bump whenever the ranking method changes: the stored result is keyed by it, so old results are not reused
   const PRIOR_TIE = 0.5;                // weight of the virtual tie between every compared pair (few-vote case)
   const swap = { left: 'right', right: 'left' };
 
@@ -127,7 +128,7 @@
       m = addTo(addTo({}, seed[ctype || 'all'] || {}, 1), (await getAgg(ctype || 'all')) || {}, 1);
     }
     m = m || {};
-    const sig = (personal ? 'p' : 'o') + (ctype || '') + '|' + Object.keys(m).sort().map(k => k + '=' + m[k]).join(',');
+    const sig = LB_VERSION + (personal ? 'p' : 'o') + (ctype || '') + '|' + Object.keys(m).sort().map(k => k + '=' + m[k]).join(',');
     if (lbMemo[sig]) return lbMemo[sig];
     const stored = lget('arena_lb', null);
     if (stored && stored.sig === sig) return (lbMemo[sig] = stored.res);   // identical counts as last time: no recomputation
