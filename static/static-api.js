@@ -116,11 +116,13 @@
     Object.values(key).forEach(k => { for (const s of ['one', 'two']) names[k[s].policy] = k[s].policy_name; });
     const types = Object.fromEntries(samples.map(s => [s.id, s.post.content_type]));
     let m;
-    if (personal || !CFG()) {                                         // own votes, from this browser
+    if (personal) {                                                   // own votes, from this browser
       m = {};
       for (const r of Object.values(votes())) if (!ctype || types[r.sample_id] === ctype) addTo(m, cellKeys(r), 1);
     } else {
-      m = await getAgg(ctype || 'all');
+      // overall = the annotators' votes (data/seed.json, anonymous counts) + the live reviewer votes (Firestore counters)
+      const seed = (await load('seed.json')) || {};
+      m = addTo(addTo({}, seed[ctype || 'all'] || {}, 1), (await getAgg(ctype || 'all')) || {}, 1);
     }
     m = m || {};
     const sig = (personal ? 'p' : 'o') + (ctype || '') + '|' + Object.keys(m).sort().map(k => k + '=' + m[k]).join(',');
