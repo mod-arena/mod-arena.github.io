@@ -516,6 +516,10 @@ function onFilterChange() {
 
 // ── Load data ─────────────────────────────────────────────────────────────
 async function load() {
+  // interface adj: show a loading circle in every table whenever the data is (re)loading (first load, filter or scope change)
+  ASPECTS.forEach(a => {
+    ['rankings-', 'h2h-', 'bc-'].forEach(id => { document.getElementById(id + a).innerHTML = '<div class="spinner" style="margin:24px auto"></div>'; });
+  });
   const content = document.getElementById('content-sel').value;
   const params = new URLSearchParams();
   if (content) params.set('content_type_filter', content);
@@ -523,7 +527,7 @@ async function load() {
   try {
     const resp = await fetch('/api/leaderboard?' + params);
     if (resp.status === 401) { window.location.href = 'login.html'; return; }
-    if (!resp.ok) return;
+    if (!resp.ok) { ASPECTS.forEach(a => { ['rankings-', 'h2h-', 'bc-'].forEach(id => { document.getElementById(id + a).innerHTML = '<div class="lb-empty">Failed to load the leaderboard.</div>'; }); }); return; }
     _lastData = await resp.json();
     ASPECTS.forEach(a => {
       const d = _lastData[a];
@@ -533,7 +537,7 @@ async function load() {
     });
     renderBattleCounts();
   } catch (e) {
-    document.getElementById('rankings-label').innerHTML = '<div class="lb-empty">Failed to load the leaderboard.</div>';
+    ASPECTS.forEach(a => { ['rankings-', 'h2h-', 'bc-'].forEach(id => { document.getElementById(id + a).innerHTML = '<div class="lb-empty">Failed to load the leaderboard.</div>'; }); });
   }
 }
 
