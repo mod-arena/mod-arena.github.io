@@ -93,14 +93,6 @@
   }
   if (CFG()) firestore();                                            // load the SDK while the page renders (writes only)
 
-  window.downloadVotes = function () {
-    const blob = new Blob([JSON.stringify({ reviewer: user(), votes: user() ? Object.values(votes()) : [] }, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'arena_votes_' + (user() || 'reviewer').replace(/[^\w-]+/g, '_') + '.json';
-    a.click();
-  };
-
   // ── leaderboard ──
   const lbMemo = {};
   function cellsFromMap(m, names) {                                   // {"label__a__b__k": n} -> {label:[cells], action:[cells]}
