@@ -198,6 +198,7 @@
     }
     if (path === '/api/policy') {
       const { id, oneLeft } = parseToken(q.get('token')), key = (await load('key.json'))[id];
+      if (!votes()[id]) return reply({ detail: 'Vote first to see the policy.' }, 403);   // the text reveals the platform
       const side = (q.get('panel') === 'a') === oneLeft ? 'one' : 'two';
       return reply({ text: (await load('policies.json'))[key[side].policy] });
     }

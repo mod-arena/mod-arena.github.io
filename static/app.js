@@ -455,7 +455,6 @@ async function loadSample() {
     document.getElementById('arena-grid').style.display = '';
     document.getElementById('arena-hint').style.display = '';
     document.getElementById('vote-action-row').style.display = 'block';
-    ['a', 'b'].forEach(p => document.getElementById(`cmp-result-view-policy-${p}`).style.display = 'inline-block');
   } catch (e) {
     out.innerHTML = `<div class="error">Network error while loading a post: ${escHtml(e.message)}</div>`;
   }
@@ -525,6 +524,7 @@ async function submitVote() {
 
 function revealIdentities() {
   _voteRevealed = true;
+  ['a', 'b'].forEach(p => { document.getElementById(`cmp-result-view-policy-${p}`).style.display = 'inline-block'; });   // interface adj
   ['a', 'b'].forEach(panel => {
     const idn = _identities[panel];
     const el = document.getElementById(`cmp-identity-${panel}`);
