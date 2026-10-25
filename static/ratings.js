@@ -34,7 +34,7 @@
       t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   }
 
-  window.computeBoard = function (cells, minBattles = 5, nBoot = 500, prior = 0) {
+  window.computeBoard = function (cells, minBattles = 5, nBoot = 500, prior = 0, poisson = false) {
     cells = cells.filter(c => c.n > 0);
     const stats = {};
     const S = e => (stats[e] = stats[e] || { wins: 0, losses: 0, ties: 0, both_bad: 0, battles: 0 });
@@ -49,17 +49,21 @@
     const rated = Object.keys(stats).filter(e => stats[e].battles >= minBattles).sort();
     const pos = Object.fromEntries(rated.map((e, i) => [e, i])), n = rated.length;
     const cmp = cells.filter(c => c.a in pos && c.b in pos);
-    // prior > 0 (the "Mine" view with only a few votes): every compared pair gets a virtual tie of that weight, which keeps the
-    // scores finite when there is no data to separate two policies; it is used for the point estimate only (no bootstrap then)
-    const fitCells = prior > 0 ? cmp.concat(cmp.map(c => ({ a: c.a, b: c.b, k: 'tie', n: prior }))) : cmp;
+    // prior > 0 (the "Mine" view with few votes): every compared pair gets a virtual tie of that weight, in the point fit and in
+    // every bootstrap fit, which keeps the scores finite when there is too little data to separate two policies.
+    const priorCells = prior > 0 ? [...new Set(cmp.map(c => c.a + '\u0000' + c.b))].map(k => { const [a, b] = k.split('\u0000'); return { a, b, k: 'tie', n: prior }; }) : [];
+    // poisson: bootstrap by giving every cell a Poisson(count) weight instead of a fixed total, so with a handful of votes a vote
+    // can drop out of a resample and the interval is not stuck at exactly zero.
     let score = [], lo = [], hi = [], rlo = [], rhi = [];
     if (cmp.length) {
       const fit = (counts) => {
         const W = new Float64Array(n), N = new Float64Array(n * n);
-        (counts ? cmp : fitCells).forEach((c, x) => {
-          const m = counts ? counts[x] : c.n, i = pos[c.a], j = pos[c.b], o = OUTCOME[c.k];
+        const add = (c, m) => {
+          const i = pos[c.a], j = pos[c.b], o = OUTCOME[c.k];
           W[i] += o * m; W[j] += (1 - o) * m; N[i * n + j] += m; N[j * n + i] += m;
-        });
+        };
+        cmp.forEach((c, x) => add(c, counts ? counts[x] : c.n));
+        priorCells.forEach(c => add(c, c.n));
         return [W, N];
       };
       const [W0, N0] = fit(null), p0 = mm(W0, N0, n, new Float64Array(n).fill(1));
@@ -68,7 +72,7 @@
       byScore.forEach((i, r) => { pr[i] = r + 1; });
       rlo = pr.slice(); rhi = pr.slice();                  // without a bootstrap the rank "spread" is the rank itself
       const total = cmp.reduce((s, c) => s + c.n, 0);
-      if (nBoot >= 20 && total >= 2) {
+      if (nBoot >= 20 && total >= 1) {
         const rand = rng(0), bs = Array.from({ length: n }, () => []), br = Array.from({ length: n }, () => []);
         const gauss = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
         const binom = (m, p) => {                       // Binomial(m, p): exact for small m, normal approximation otherwise
@@ -77,13 +81,23 @@
           if (m < 40) { let c = 0; for (let i = 0; i < m; i++) if (rand() < p) c++; return c; }
           return Math.max(0, Math.min(m, Math.round(m * p + Math.sqrt(m * p * (1 - p)) * gauss())));
         };
+        const pois = lam => {                            // Poisson(lam): Knuth for small lam, normal approximation otherwise
+          if (lam >= 30) return Math.max(0, Math.round(lam + Math.sqrt(lam) * gauss()));
+          const L = Math.exp(-lam); let k = 0, q = 1;
+          do { k++; q *= rand(); } while (q > L);
+          return k - 1;
+        };
         for (let t = 0; t < nBoot; t++) {
           // resampling all comparisons with replacement = a multinomial draw over the cells (cost: cells, not votes)
           const counts = new Float64Array(cmp.length);
-          let left = total, mass = total;
-          for (let x = 0; x < cmp.length && left > 0; x++) {
-            counts[x] = x === cmp.length - 1 ? left : binom(left, cmp[x].n / mass);
-            left -= counts[x]; mass -= cmp[x].n;
+          if (poisson) {
+            cmp.forEach((c, x) => { counts[x] = pois(c.n); });
+          } else {
+            let left = total, mass = total;
+            for (let x = 0; x < cmp.length && left > 0; x++) {
+              counts[x] = x === cmp.length - 1 ? left : binom(left, cmp[x].n / mass);
+              left -= counts[x]; mass -= cmp[x].n;
+            }
           }
           const [W, N] = fit(counts), s = elo(mm(W, N, n, p0));
           const order = s.map((v, i) => i).sort((x, y) => (s[y] - s[x]) || (x - y)), rank = Array(n);

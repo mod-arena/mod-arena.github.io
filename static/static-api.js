@@ -16,6 +16,8 @@
   const load = f => cache[f] || (cache[f] = fetch('data/' + f).then(r => (r.ok ? r.json() : null)).catch(() => null));
   const CFG = () => window.FIREBASE_CONFIG;
   const ASPECTS = ['label', 'action'];
+  const MIN_VOTES_FOR_BOOTSTRAP = 30;   // "Mine": below this many votes use the prior + Poisson bootstrap, from here the normal bootstrap
+  const PRIOR_TIE = 0.5;                // weight of the virtual tie between every compared pair (few-vote case)
   const swap = { left: 'right', right: 'left' };
 
   // ── session (ends with the tab, like the original session cookie) ──
@@ -132,8 +134,9 @@
     const c = cellsFromMap(m, names), res = {};
     // overall: a policy is ranked once it has 5 battles; "Mine" ranks from the very first vote
     for (const asp of ASPECTS) {
-      const few = personal && c[asp].reduce((s, x) => s + x.n, 0) < 30;       // too few votes for intervals: point estimate with a small prior
-      res[asp] = window.computeBoard(c[asp], personal ? 1 : 5, few ? 0 : 500, few ? 0.5 : 0);
+      // "Mine" with fewer than MIN_VOTES_FOR_BOOTSTRAP votes: small prior + Poisson bootstrap, so the intervals are wide rather than zero
+      const few = personal && c[asp].reduce((s, x) => s + x.n, 0) < MIN_VOTES_FOR_BOOTSTRAP;
+      res[asp] = window.computeBoard(c[asp], personal ? 1 : 5, 500, few ? PRIOR_TIE : 0, few);
     }
     res.available_content_types = [...new Set(Object.values(types))].sort();
     lbMemo[sig] = res; lset('arena_lb', { sig, res });
