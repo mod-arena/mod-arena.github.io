@@ -130,7 +130,11 @@
     const stored = lget('arena_lb', null);
     if (stored && stored.sig === sig) return (lbMemo[sig] = stored.res);   // identical counts as last time: no recomputation
     const c = cellsFromMap(m, names), res = {};
-    for (const asp of ASPECTS) res[asp] = window.computeBoard(c[asp], 5, 500);
+    // overall: a policy is ranked once it has 5 battles; "Mine" ranks from the very first vote
+    for (const asp of ASPECTS) {
+      const few = personal && c[asp].reduce((s, x) => s + x.n, 0) < 30;       // too few votes for intervals: point estimate with a small prior
+      res[asp] = window.computeBoard(c[asp], personal ? 1 : 5, few ? 0 : 500, few ? 0.5 : 0);
+    }
     res.available_content_types = [...new Set(Object.values(types))].sort();
     lbMemo[sig] = res; lset('arena_lb', { sig, res });
     return res;

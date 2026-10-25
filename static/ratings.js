@@ -34,7 +34,7 @@
       t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   }
 
-  window.computeBoard = function (cells, minBattles = 5, nBoot = 500) {
+  window.computeBoard = function (cells, minBattles = 5, nBoot = 500, prior = 0) {
     cells = cells.filter(c => c.n > 0);
     const stats = {};
     const S = e => (stats[e] = stats[e] || { wins: 0, losses: 0, ties: 0, both_bad: 0, battles: 0 });
@@ -49,18 +49,24 @@
     const rated = Object.keys(stats).filter(e => stats[e].battles >= minBattles).sort();
     const pos = Object.fromEntries(rated.map((e, i) => [e, i])), n = rated.length;
     const cmp = cells.filter(c => c.a in pos && c.b in pos);
+    // prior > 0 (the "Mine" view with only a few votes): every compared pair gets a virtual tie of that weight, which keeps the
+    // scores finite when there is no data to separate two policies; it is used for the point estimate only (no bootstrap then)
+    const fitCells = prior > 0 ? cmp.concat(cmp.map(c => ({ a: c.a, b: c.b, k: 'tie', n: prior }))) : cmp;
     let score = [], lo = [], hi = [], rlo = [], rhi = [];
     if (cmp.length) {
       const fit = (counts) => {
         const W = new Float64Array(n), N = new Float64Array(n * n);
-        cmp.forEach((c, x) => {
+        (counts ? cmp : fitCells).forEach((c, x) => {
           const m = counts ? counts[x] : c.n, i = pos[c.a], j = pos[c.b], o = OUTCOME[c.k];
           W[i] += o * m; W[j] += (1 - o) * m; N[i * n + j] += m; N[j * n + i] += m;
         });
         return [W, N];
       };
       const [W0, N0] = fit(null), p0 = mm(W0, N0, n, new Float64Array(n).fill(1));
-      score = elo(p0); lo = score.slice(); hi = score.slice(); rlo = Array(n).fill(1); rhi = Array(n).fill(n);
+      score = elo(p0); lo = score.slice(); hi = score.slice();
+      const byScore = score.map((v, i) => i).sort((x, y) => (score[y] - score[x]) || (x - y)), pr = Array(n);
+      byScore.forEach((i, r) => { pr[i] = r + 1; });
+      rlo = pr.slice(); rhi = pr.slice();                  // without a bootstrap the rank "spread" is the rank itself
       const total = cmp.reduce((s, c) => s + c.n, 0);
       if (nBoot >= 20 && total >= 2) {
         const rand = rng(0), bs = Array.from({ length: n }, () => []), br = Array.from({ length: n }, () => []);
