@@ -175,8 +175,7 @@ function buildCard(d, platform) {
     <div class="author">
       ${avatar}
       <div class="author-info">
-        <span class="display-name">${escHtml(d.display_name)}</span>
-        <span class="handle">@${esc(d.handle)}</span>
+        <span class="display-name">Anonymous user</span>
       </div>
       ${platformBadge}
     </div>
