@@ -343,6 +343,7 @@ function toggleSidebar() {
   </div>
   <style>
     .lb-measures { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px; }
+    .lb-footnote { margin: 8px 2px 0; font-size: 0.76rem; line-height: 1.45; color: var(--text-muted); }
     .lb-measures-intro { margin: 0 0 8px; font-size: 0.84rem; line-height: 1.5; color: var(--text-muted); }
     .lb-measures-hint { font-weight: 400; color: var(--text-muted); font-size: 0.8rem; }
     .lb-measures summary { cursor: pointer; font-weight: 700; color: var(--text-primary); font-size: 0.95rem; }
@@ -382,10 +383,9 @@ function toggleSidebar() {
         <div class="col-picker-dropdown" id="col-picker-dropdown"></div>
       </div>
     </div>
-    <p class="h2h-caption">Bluesky is not ranked on <strong>actions</strong>: it is decentralised, so each user (or labeler) chooses which actions to apply (hide, warn, ...) and there is no fixed action to compare. It is ranked on labels only.</p>
     <div class="lb-cols">
       <div class="lb-col"><h3 class="lb-col-title">Label <span id="n-label" class="lb-n"></span></h3><div class="lb-scroll"><div id="rankings-label"></div></div></div>
-      <div class="lb-col"><h3 class="lb-col-title">Action <span id="n-action" class="lb-n"></span></h3><div class="lb-scroll"><div id="rankings-action"></div></div></div>
+      <div class="lb-col"><h3 class="lb-col-title">Action <span id="n-action" class="lb-n"></span></h3><div class="lb-scroll"><div id="rankings-action"></div></div><p class="lb-footnote">* Bluesky is not ranked on actions: it allows each user to choose which actions to apply (hide, warn, ...) for a given label so there is no fixed action to compare. It is ranked on labels only.</p></div>
     </div>
   </div>
 
@@ -397,7 +397,7 @@ function toggleSidebar() {
     <p class="h2h-caption">Each cell shows the <strong>row</strong> policy's win rate against the <strong>column</strong> policy (ties excluded). A dot means the two were never compared.</p>
     <div class="lb-cols">
       <div class="lb-col"><h3 class="lb-col-title">Label</h3><div class="h2h-scroll"><div id="h2h-label"></div></div></div>
-      <div class="lb-col"><h3 class="lb-col-title">Action</h3><div class="h2h-scroll"><div id="h2h-action"></div></div></div>
+      <div class="lb-col"><h3 class="lb-col-title">Action</h3><div class="h2h-scroll"><div id="h2h-action"></div></div><p class="lb-footnote">* Bluesky is not ranked on actions: it allows each user to choose which actions to apply (hide, warn, ...) for a given label so there is no fixed action to compare. It is ranked on labels only.</p></div>
     </div>
   </div>
 
@@ -413,7 +413,7 @@ function toggleSidebar() {
     <p class="h2h-caption" id="battle-count-caption"></p>
     <div class="lb-cols">
       <div class="lb-col"><h3 class="lb-col-title">Label</h3><div class="h2h-scroll"><div id="bc-label"></div></div></div>
-      <div class="lb-col"><h3 class="lb-col-title">Action</h3><div class="h2h-scroll"><div id="bc-action"></div></div></div>
+      <div class="lb-col"><h3 class="lb-col-title">Action</h3><div class="h2h-scroll"><div id="bc-action"></div></div><p class="lb-footnote">* Bluesky is not ranked on actions: it allows each user to choose which actions to apply (hide, warn, ...) for a given label so there is no fixed action to compare. It is ranked on labels only.</p></div>
     </div>
   </div>
 
@@ -567,6 +567,11 @@ async function load() {
     if (resp.status === 401) { window.location.href = 'login.html'; return; }
     if (!resp.ok) { ASPECTS.forEach(a => { ['rankings-', 'h2h-', 'bc-'].forEach(id => { document.getElementById(id + a).innerHTML = '<div class="lb-empty">Failed to load the leaderboard.</div>'; }); }); return; }
     _lastData = await resp.json();
+    // interface adj: placeholder row so the Action tables are as tall as the Label ones (Bluesky has no action votes)
+    if (_lastData.action && !_lastData.action.rows.some(r => r.name === 'Bluesky')) {
+      _lastData.action.rows.push({ name: 'Bluesky*', rank: null, bt_score: null, score_ci: null, rank_lo: null, rank_hi: null, battles: '—',
+        wins: '—', losses: '—', ties: '—', both_bad: '—', win_rate: null, loss_rate: null, tie_rate: null, both_bad_rate: null });
+    }
     ASPECTS.forEach(a => {
       const d = _lastData[a];
       document.getElementById('rankings-' + a).innerHTML = rankingsTable(d.rows);
