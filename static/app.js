@@ -214,19 +214,19 @@ function translateBox(t) {
   </div>`;
 }
 
-function initTranslations(root) {
-  root.querySelectorAll('.tr-box').forEach(box => {
-    const text = box.dataset.text;
-    detectLanguage(text).then(r => {
-      const english = !r.lang || r.lang.toLowerCase().startsWith('en');
-      if (english || r.english.trim() === text.slice(0, 500).trim()) return;     // already English / nothing to translate
-      // give the website the language Google's detection found, so it does not have to guess again (it can guess wrongly)
-      if (r.lang && r.lang !== 'und') box.querySelector('a').href = _googleUrl(text, r.lang);
-      box.hidden = false;
-    }).catch(() => { box.hidden = false; });                                    // Google not reachable: show the link
-  });
-}
-
+const _EN_STOP = new Set("the and to of a in is it you that for on with this are was be at as my have not but we they so just me what all your i he she do if when can will from by an or about out up there one get like how who been had his her their no more would them than its our im".split(' '));
+    function looksEnglish(text) {        // interface adj: local check, nothing is sent anywhere
+      const letters = text.replace(/[^\p{L}]/gu, '');
+      if (letters.length < 15) return false;                                           // too short to tell (hashtags, names): show the link
+      if ((letters.match(/[A-Za-z]/g) || []).length / letters.length < 0.95) return false;   // other scripts
+      const words = text.toLowerCase().match(/[a-z']+/g) || [];
+      if (words.length < 5) return false;
+      return words.filter(w => _EN_STOP.has(w.replace(/'/g, ''))).length / words.length >= 0.25;
+    }
+    function initTranslations(root) {    // interface adj: the link is always available unless the text clearly is English
+      root.querySelectorAll('.tr-box').forEach(box => { if (!looksEnglish(box.dataset.text)) box.hidden = false; });
+    }
+    
 function togglePostText(btn) {
   const container = btn.closest('.post-text-collapsible');
   const preview = container.querySelector('.post-text-preview');
@@ -452,6 +452,7 @@ async function loadSample() {
     initVideo(data.post.video);
     initTranslations(out);
     renderArena(data.panels);
+    applyRowRules(data.rules);                              // interface adj
     document.getElementById('arena-grid').style.display = '';
     document.getElementById('arena-hint').style.display = '';
     document.getElementById('vote-action-row').style.display = 'block';
@@ -464,9 +465,33 @@ async function loadSample() {
 const _PREF_KEYS = ['label', 'action'];
 const _PREF_VALS = ['left', 'tie', 'neither', 'right'];
 
-function allAnswered() {
-  return _PREF_KEYS.every(k => _prefs[k]);
-}
+let _rules = {};     // interface adj: {same_label, same_action, action_na} of the post on screen
+    function activeKeys() { return _PREF_KEYS.filter(k => !(k === 'action' && _rules.action_na)); }
+    function allAnswered() {
+      return activeKeys().every(k => _prefs[k]);
+    }
+    function applyRowRules(rules) {      // interface adj
+      _rules = rules || {};
+      [['label', _rules.same_label], ['action', _rules.same_action && !_rules.action_na]].forEach(([k, same]) => {
+        ['left', 'right'].forEach(v => { document.getElementById(`pref-${k}-${v}`).style.display = same ? 'none' : ''; });
+      });
+      if (_rules.action_na) {
+        ['a', 'b'].forEach(p => { document.getElementById(`ag-action-${p}`).innerHTML = '<div class="ag-nochoice">—</div>'; });
+        const seg = document.getElementById('pref-action-left').parentElement;
+        seg.style.display = 'none';
+        let note = document.getElementById('action-na-note');
+        if (!note) { note = document.createElement('div'); note.id = 'action-na-note'; note.className = 'ag-sub'; seg.parentElement.appendChild(note); }
+        note.textContent = 'Not compared here: one of the two policies is Bluesky, which is decentralised: each user chooses which actions to apply, so it has no fixed action.';
+        note.style.display = '';
+      }
+    }
+    function resetRowRules() {           // interface adj
+      _rules = {};
+      ['label', 'action'].forEach(k => ['left', 'right'].forEach(v => { document.getElementById(`pref-${k}-${v}`).style.display = ''; }));
+      document.getElementById('pref-action-left').parentElement.style.display = '';
+      const note = document.getElementById('action-na-note');
+      if (note) note.style.display = 'none';
+    }
 
 function setPreference(key, val) {
   _prefs[key] = val;
@@ -476,9 +501,9 @@ function setPreference(key, val) {
 }
 
 function updateVoteProgress() {
-  const n = _PREF_KEYS.filter(k => _prefs[k]).length;
+  const keys = activeKeys(), n = keys.filter(k => _prefs[k]).length;      // interface adj
   document.getElementById('vote-progress').textContent =
-    n === _PREF_KEYS.length ? 'Both rows marked — you can submit.' : `Mark both rows to submit (${n} of ${_PREF_KEYS.length}).`;
+    n === keys.length ? (keys.length === 1 ? 'The row is marked — you can submit.' : 'Both rows marked — you can submit.') : `Mark ${keys.length === 1 ? 'the row' : 'both rows'} to submit (${n} of ${keys.length}).`;
 }
 
 function highlightPreferences() {
@@ -496,7 +521,7 @@ async function submitVote() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token: _sample.token,
-        pref_label: _prefs.label, pref_action: _prefs.action,
+        pref_label: _prefs.label, pref_action: _rules.action_na ? 'na' : _prefs.action,
       }),
     });
     if (resp.status === 401) { window.location.href = 'login.html'; return; }
@@ -545,6 +570,7 @@ function skipVote() {
 }
 
 function clearVotingUI() {
+  resetRowRules();                                      // interface adj
   const reveal = document.getElementById('arena-reveal');     // absent on the annotation page
   if (reveal) reveal.style.display = 'none';
   _prefs = { label: null, action: null };

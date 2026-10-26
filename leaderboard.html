@@ -327,7 +327,7 @@ function toggleSidebar() {
         <dt>Rank spread</dt>
         <dd>The range (95%) of the policy's rank over the same resamples, e.g. <em>2&ndash;4</em>: its rank could plausibly be anywhere from 2nd to 4th. A single number means the rank was stable.</dd>
         <dt>Battles</dt>
-        <dd>How many votes the policy was part of (each vote compares two policies on the label and again on the action).</dd>
+        <dd>How many votes the policy was part of (each vote compares two policies on the label and again on the action; Bluesky has no action votes).</dd>
         <dt>Win %, Loss %</dt>
         <dd>Among the decisive votes only (ties and <em>Neither</em> left out): the share in which the policy was preferred, or not preferred.</dd>
         <dt>Tie %, Neither %</dt>
@@ -382,6 +382,7 @@ function toggleSidebar() {
         <div class="col-picker-dropdown" id="col-picker-dropdown"></div>
       </div>
     </div>
+    <p class="h2h-caption">Bluesky is not ranked on <strong>actions</strong>: it is decentralised, so each user (or labeler) chooses which actions to apply (hide, warn, ...) and there is no fixed action to compare. It is ranked on labels only.</p>
     <div class="lb-cols">
       <div class="lb-col"><h3 class="lb-col-title">Label <span id="n-label" class="lb-n"></span></h3><div class="lb-scroll"><div id="rankings-label"></div></div></div>
       <div class="lb-col"><h3 class="lb-col-title">Action <span id="n-action" class="lb-n"></span></h3><div class="lb-scroll"><div id="rankings-action"></div></div></div>

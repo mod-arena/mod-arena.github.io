@@ -17,7 +17,7 @@
   const CFG = () => window.FIREBASE_CONFIG;
   const ASPECTS = ['label', 'action'];
   const MIN_VOTES_FOR_BOOTSTRAP = 30;   // "Mine": below this many votes use the prior + Poisson bootstrap, from here the normal bootstrap
-  const LB_VERSION = 'v3';              // bump whenever the ranking method changes: the stored result is keyed by it, so old results are not reused
+  const LB_VERSION = 'v4';              // bump whenever the ranking method changes: the stored result is keyed by it, so old results are not reused
   const PRIOR_TIE = 0.5;                // weight of the virtual tie between every compared pair (few-vote case)
   const swap = { left: 'right', right: 'left' };
 
@@ -31,6 +31,7 @@
     const [a, b] = row.left_policy < row.right_policy ? [row.left_policy, row.right_policy] : [row.right_policy, row.left_policy];
     const leftIsA = row.left_policy === a, out = {};
     for (const asp of ASPECTS) {
+      if (asp === 'action' && (row.pref_action === 'na' || a === 'bluesky' || b === 'bluesky')) continue;   // Bluesky is decentralised: no action votes
       const p = row['pref_' + asp];
       const k = p === 'tie' ? 'tie' : p === 'neither' ? 'neither' : (p === 'left') === leftIsA ? 'a' : 'b';
       out[`${asp}__${a}__${b}__${k}`] = 1;
@@ -99,6 +100,7 @@
     const out = { label: [], action: [] };
     for (const [key, n] of Object.entries(m || {})) {
       const [asp, a, b, k] = key.split('__');
+      if (asp === 'action' && (a === 'bluesky' || b === 'bluesky')) continue;
       if (out[asp] && n > 0) out[asp].push({ a: names[a] || a, b: names[b] || b, k, n });
     }
     // ordering inside a pair follows the display names (a < b), so flip cells whose names sorted the other way
@@ -181,17 +183,19 @@
       while (i < pool.length - 1 && (x -= w[i]) > 0) i++;
       const s = pool[i], oneLeft = Math.random() < 0.5;
       return reply({ done: false, sample_id: s.id, token: s.id + '.' + (oneLeft ? 1 : 0), post: s.post,
-        panels: { a: oneLeft ? s.one : s.two, b: oneLeft ? s.two : s.one }, total: all.length, voted: done.size });
+        panels: { a: oneLeft ? s.one : s.two, b: oneLeft ? s.two : s.one }, rules: s.rules || {}, total: all.length, voted: done.size });
     }
     if (path === '/api/vote') {
       const { id, oneLeft } = parseToken(body.token), key = (await load('key.json'))[id];
       if (!key) return reply({ detail: 'Invalid token.' }, 400);
-      for (const v of [body.pref_label, body.pref_action]) if (!['left', 'right', 'tie', 'neither'].includes(v)) return reply({ detail: 'Invalid preference.' }, 400);
+      const s = (await load('samples.json')).find(x => x.id === id), rules = (s && s.rules) || {};
+      const valid = (v, same) => ['tie', 'neither'].includes(v) || (!same && ['left', 'right'].includes(v));   // identical output on both sides: only Both / Neither
+      if (!valid(body.pref_label, rules.same_label)) return reply({ detail: 'Invalid preference.' }, 400);
+      if (rules.action_na ? body.pref_action !== 'na' : !valid(body.pref_action, rules.same_action)) return reply({ detail: 'Invalid preference.' }, 400);
       const left = oneLeft ? key.one : key.two, right = oneLeft ? key.two : key.one;
       const row = { reviewer: user(), sample_id: id, mode: 'arena', left_policy: left.policy, right_policy: right.policy,
         pref_label: body.pref_label, pref_action: body.pref_action, created_at: new Date().toISOString() };
       const v = votes(), old = v[id] || null; v[id] = row; lset(votesKey(), v);
-      const s = (await load('samples.json')).find(x => x.id === id);
       pushVote(row, old, s && s.post.content_type);
       const det = s => ({ policy_quotes: s.policy_quotes, explanation: s.explanation });
       return reply({ ok: true, vote_count: Object.keys(v).length, identities: { a: left, b: right }, details: { a: det(left), b: det(right) } });
