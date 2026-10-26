@@ -209,24 +209,13 @@ function detectLanguage(text) {
 
 // markup for one text; hidden until initTranslations() has decided it is not English
 function translateBox(t) {
-  return `<div class="tr-box" hidden data-text="${escAttr(t)}">
-    <a class="view-link view-link-accent translate-link" target="_blank" rel="noopener noreferrer" href="${esc(_googleUrl(t))}"><i class="fa-solid fa-language"></i> Translate to English (opens Google Translate)</a>
+  return `<div class="tr-box" data-text="${escAttr(t)}">
+    <a class="view-link view-link-accent translate-link" target="_blank" rel="noopener noreferrer" href="${esc(_googleUrl(t))}"><i class="fa-solid fa-language"></i> Translate</a>
   </div>`;
 }
 
-const _EN_STOP = new Set("the and to of a in is it you that for on with this are was be at as my have not but we they so just me what all your i he she do if when can will from by an or about out up there one get like how who been had his her their no more would them than its our im".split(' '));
-    function looksEnglish(text) {        // interface adj: local check, nothing is sent anywhere
-      const letters = text.replace(/[^\p{L}]/gu, '');
-      if (letters.length < 15) return false;                                           // too short to tell (hashtags, names): show the link
-      if ((letters.match(/[A-Za-z]/g) || []).length / letters.length < 0.95) return false;   // other scripts
-      const words = text.toLowerCase().match(/[a-z']+/g) || [];
-      if (words.length < 5) return false;
-      return words.filter(w => _EN_STOP.has(w.replace(/'/g, ''))).length / words.length >= 0.25;
-    }
-    function initTranslations(root) {    // interface adj: the link is always available unless the text clearly is English
-      root.querySelectorAll('.tr-box').forEach(box => { if (!looksEnglish(box.dataset.text)) box.hidden = false; });
-    }
-    
+function initTranslations(root) { /* interface adj: nothing to decide, the link is always shown */ }
+
 function togglePostText(btn) {
   const container = btn.closest('.post-text-collapsible');
   const preview = container.querySelector('.post-text-preview');
